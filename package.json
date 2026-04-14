@@ -1,7 +1,7 @@
 {
   "name": "skillui",
-  "version": "1.3.2",
-  "description": "Reverse-engineer design systems from any website, repo, or project. Extracts colors, fonts, spacing, animations, and components — packaged as a .skill file for Claude. Pure static analysis, zero AI, zero API keys.",
+  "version": "1.3.3",
+  "description": "Reverse-engineer design systems from any website, repo, or project. Extracts colors, fonts, spacing, animations, and components - packaged as a .skill file for Claude. Pure static analysis, zero AI, zero API keys.",
   "main": "dist/cli.js",
   "bin": {
     "skillui": "dist/cli.js"
@@ -32,10 +32,10 @@
   "homepage": "https://skillui.vercel.app/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/amaancoderx/skillui.git"
+    "url": "https://github.com/amaancoderx/npxskillui.git"
   },
   "bugs": {
-    "url": "https://github.com/amaancoderx/skillui/issues"
+    "url": "https://github.com/amaancoderx/npxskillui/issues"
   },
   "dependencies": {
     "@babel/parser": "^7.24.0",
@@ -84,6 +84,7 @@
   },
   "files": [
     "dist/cli.js",
-    "README.md"
+    "README.md",
+    "skillui.png"
   ]
 }
