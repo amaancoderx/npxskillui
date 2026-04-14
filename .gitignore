@@ -1,0 +1,19 @@
+node_modules/
+dist/
+
+# Generated design output folders
+*-design/
+*-design.skill
+*-design.zip
+*.skill
+*.zip
+
+# Local files
+Downloads/
+*.mp4
+*.pdf
+*.html
+
+# OS
+.DS_Store
+Thumbs.db
