@@ -23,7 +23,7 @@ https://github.com/user-attachments/assets/4d6b63f1-8042-44a2-8f4f-a92fedadcaf9
 
 ## What is SkillUI?
 
-**SkillUI** is a CLI that crawls any website, git repo, or local codebase and extracts its complete design system — colors, typography, spacing, animations, components, screenshots — packaged into a folder Claude Code reads automatically.
+**SkillUI** is a CLI that crawls any website, git repo, or local codebase and extracts its complete design system - colors, typography, spacing, animations, components, screenshots - packaged into a folder Claude Code reads automatically.
 
 Open the output folder, type `claude`, and ask Claude to build your UI. It already knows the exact design system.
 
@@ -59,13 +59,13 @@ cd notion-design && claude
 "Build me a landing page that matches this design system"
 ```
 
-Claude automatically reads `CLAUDE.md` and `SKILL.md` — no manual setup needed. It uses the extracted colors, typography, spacing, components, animations, and screenshots to generate an HTML file matching the exact visual language of the site.
+Claude automatically reads `CLAUDE.md` and `SKILL.md` - no manual setup needed. It uses the extracted colors, typography, spacing, components, animations, and screenshots to generate an HTML file matching the exact visual language of the site.
 
 ---
 
 ## Modes
 
-### Default mode — pure static analysis
+### Default mode - pure static analysis
 
 Extracts HTML, CSS, fonts, color tokens, spacing, and typography. Works on any site, no browser required.
 
@@ -73,7 +73,7 @@ Extracts HTML, CSS, fonts, color tokens, spacing, and typography. Works on any s
 skillui --url https://linear.app
 ```
 
-### Ultra mode — full cinematic extraction
+### Ultra mode - full cinematic extraction
 
 Uses Playwright to capture scroll screenshots, interaction diffs, animation detection, layout analysis, and DOM component fingerprinting.
 
@@ -81,7 +81,7 @@ Uses Playwright to capture scroll screenshots, interaction diffs, animation dete
 skillui --url https://linear.app --mode ultra
 ```
 
-### Dir mode — local project scan
+### Dir mode - local project scan
 
 Scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns.
 
@@ -89,7 +89,7 @@ Scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind 
 skillui --dir ./my-app
 ```
 
-### Repo mode — clone and scan
+### Repo mode - clone and scan
 
 Clones any public git repository and runs dir mode automatically.
 
@@ -164,7 +164,7 @@ skillui --repo <url>          Clone and scan a git repository
 ## Examples
 
 ```bash
-# Full ultra extraction — Nothing.tech
+# Full ultra extraction - Nothing.tech
 skillui --url https://nothing.tech --mode ultra --screens 10
 
 # Scan a local Next.js app
@@ -236,12 +236,12 @@ skillui --url https://linear.app --out ./design-systems
 
 ## How It Works
 
-SkillUI uses pure static analysis. No AI, no API keys, no cloud — everything runs locally.
+SkillUI uses pure static analysis. No AI, no API keys, no cloud - everything runs locally.
 
-- **URL mode** — fetches HTML, crawls all linked CSS files, extracts computed styles via Playwright DOM inspection
-- **Dir mode** — scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns
-- **Repo mode** — clones the repo to a temp directory and runs dir mode
-- **Ultra mode** — runs Playwright to capture scroll screenshots, detect animation libraries from `window.*` globals, extract `@keyframes` from `document.styleSheets`, capture hover/focus state diffs, fingerprint DOM components
+- **URL mode** - fetches HTML, crawls all linked CSS files, extracts computed styles via Playwright DOM inspection
+- **Dir mode** - scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns
+- **Repo mode** - clones the repo to a temp directory and runs dir mode
+- **Ultra mode** - runs Playwright to capture scroll screenshots, detect animation libraries from `window.*` globals, extract `@keyframes` from `document.styleSheets`, capture hover/focus state diffs, fingerprint DOM components
 
 ---
 
@@ -263,4 +263,4 @@ SkillUI uses pure static analysis. No AI, no API keys, no cloud — everything r
 
 ## License
 
-MIT — built by [Amaan](https://github.com/amaancoderx)
+MIT - built by [Amaan](https://github.com/amaancoderx)
