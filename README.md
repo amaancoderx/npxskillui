@@ -1,15 +1,15 @@
 <div align="center">
-  <img src="skillui.png" alt="SkillUI" width="600" />
-</div>
+  <a href="https://skillui.vercel.app">
+    <img src="skillui.png" alt="SkillUI" width="620" />
+  </a>
+  <br /><br />
+  <p><strong>Reverse-engineer any design system into a Claude-ready skill.<br/>Pure static analysis. No AI. No API keys.</strong></p>
 
-<div align="center">
-
-**Reverse-engineer any design system into a Claude-ready skill. Pure static analysis. No AI, no API keys.**
-
-[![npm version](https://img.shields.io/npm/v/skillui?color=%23e8735a&style=flat-square)](https://www.npmjs.com/package/skillui)
-[![npm downloads](https://img.shields.io/npm/dm/skillui?color=%23e8735a&style=flat-square)](https://www.npmjs.com/package/skillui)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+  [![npm version](https://img.shields.io/npm/v/skillui?color=%23e8735a&label=skillui&style=flat-square)](https://www.npmjs.com/package/skillui)
+  [![npm downloads](https://img.shields.io/npm/dm/skillui?color=%23e8735a&style=flat-square)](https://www.npmjs.com/package/skillui)
+  [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](https://github.com/amaancoderx/npxskillui/blob/main/LICENSE)
+  [![GitHub repo](https://img.shields.io/badge/source-npxskillui-gray?style=flat-square&logo=github)](https://github.com/amaancoderx/npxskillui)
 
 </div>
 
@@ -23,19 +23,9 @@ https://github.com/user-attachments/assets/4d6b63f1-8042-44a2-8f4f-a92fedadcaf9
 
 ## What is SkillUI?
 
-**SkillUI** is a CLI that reverse-engineers the complete design system from any website, git repo, or local codebase — and packages it as a `.skill` file that Claude Code reads automatically.
+**SkillUI** is a CLI that crawls any website, git repo, or local codebase and extracts its complete design system — colors, typography, spacing, animations, components, screenshots — packaged into a folder Claude Code reads automatically.
 
-Point it at any site and get:
-
-- Exact color tokens, typography scale, spacing grid
-- CSS keyframes, animation libraries, scroll triggers
-- Hover/focus interaction state diffs
-- Flex/grid layout structures
-- DOM component fingerprints
-- 7 cinematic scroll journey screenshots
-- Google Fonts bundled locally
-
-All packaged into an output folder with `CLAUDE.md` + `SKILL.md` so Claude picks up the entire design context the moment you open it.
+Open the output folder, type `claude`, and ask Claude to build your UI. It already knows the exact design system.
 
 ---
 
@@ -45,9 +35,9 @@ All packaged into an output folder with `CLAUDE.md` + `SKILL.md` so Claude picks
 npm install -g skillui
 ```
 
-Requires **Node.js 18+**
+> Requires **Node.js 18+**
 
-For ultra mode (full visual extraction):
+For **ultra mode** (full visual extraction with Playwright):
 
 ```bash
 npm install playwright
@@ -59,53 +49,71 @@ npx playwright install chromium
 ## Quick Start
 
 ```bash
-# Extract a design system from any URL
+# 1. Extract a design system from any URL
 skillui --url https://notion.so
 
-# Open the output folder in Claude Code
+# 2. Open the output folder in Claude Code
 cd notion-design && claude
 
-# Ask Claude to build your UI
+# 3. Ask Claude to build your UI
 "Build me a landing page that matches this design system"
 ```
 
-Claude automatically reads `CLAUDE.md` and `SKILL.md` from the folder and generates an HTML file matching the exact visual language of the site.
+Claude automatically reads `CLAUDE.md` and `SKILL.md` — no manual setup needed. It uses the extracted colors, typography, spacing, components, animations, and screenshots to generate an HTML file matching the exact visual language of the site.
 
 ---
 
 ## Modes
 
-### Default mode
+### Default mode — pure static analysis
 
-Pure static analysis — HTML, CSS, fonts, color tokens, spacing, typography.
+Extracts HTML, CSS, fonts, color tokens, spacing, and typography. Works on any site, no browser required.
 
 ```bash
 skillui --url https://linear.app
 ```
 
-### Ultra mode
+### Ultra mode — full cinematic extraction
 
-Full cinematic extraction using Playwright — scroll screenshots, interaction diffs, animation detection, layout analysis, DOM component fingerprinting.
+Uses Playwright to capture scroll screenshots, interaction diffs, animation detection, layout analysis, and DOM component fingerprinting.
 
 ```bash
 skillui --url https://linear.app --mode ultra
 ```
 
-### Dir mode
+### Dir mode — local project scan
 
-Scan a local project for design tokens, Tailwind config, CSS variables, component patterns.
+Scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns.
 
 ```bash
 skillui --dir ./my-app
 ```
 
-### Repo mode
+### Repo mode — clone and scan
 
-Clone any public git repo and run dir mode automatically.
+Clones any public git repository and runs dir mode automatically.
 
 ```bash
 skillui --repo https://github.com/org/repo
 ```
+
+---
+
+## What You Get
+
+| Feature | Default | Ultra |
+|---|:---:|:---:|
+| Color tokens (CSS vars + JSON) | ✅ | ✅ |
+| Typography scale | ✅ | ✅ |
+| Spacing grid | ✅ | ✅ |
+| Google Fonts bundled locally | ✅ | ✅ |
+| `CLAUDE.md` + `SKILL.md` auto-generated | ✅ | ✅ |
+| `.skill` ZIP packaged | ✅ | ✅ |
+| 7 scroll journey screenshots | | ✅ |
+| Hover / focus interaction diffs | | ✅ |
+| CSS keyframes + animation detection | | ✅ |
+| Flex/grid layout extraction | | ✅ |
+| DOM component fingerprinting | | ✅ |
 
 ---
 
@@ -115,7 +123,7 @@ skillui --repo https://github.com/org/repo
 notion-design/
 ├── notion-design.skill       # Packaged .skill ZIP (contains everything)
 ├── SKILL.md                  # Master skill file (auto-loaded by Claude)
-├── CLAUDE.md                 # Claude Code project instructions
+├── CLAUDE.md                 # Claude Code project context
 ├── DESIGN.md                 # Full design system tokens
 ├── references/
 │   ├── ANIMATIONS.md         # Motion specs and keyframes
@@ -153,24 +161,6 @@ skillui --repo <url>          Clone and scan a git repository
 
 ---
 
-## What You Get
-
-| Feature | Default | Ultra |
-|---|:---:|:---:|
-| Color tokens | ✅ | ✅ |
-| Typography scale | ✅ | ✅ |
-| Spacing grid | ✅ | ✅ |
-| CSS variables | ✅ | ✅ |
-| Font bundles | ✅ | ✅ |
-| CLAUDE.md + SKILL.md | ✅ | ✅ |
-| Scroll journey screenshots | | ✅ |
-| Interaction state diffs | | ✅ |
-| Animation detection | | ✅ |
-| Layout extraction | | ✅ |
-| DOM component fingerprinting | | ✅ |
-
----
-
 ## Examples
 
 ```bash
@@ -192,13 +182,65 @@ skillui --url https://linear.app --out ./design-systems
 
 ---
 
+## Package Info
+
+<div align="center">
+
+| | |
+|---|---|
+| **Package** | [npmjs.com/package/skillui](https://www.npmjs.com/package/skillui) |
+| **Latest version** | `1.3.2` |
+| **First published** | April 8, 2026 |
+| **Last updated** | April 10, 2026 |
+| **License** | MIT |
+| **Author** | [Amaan](https://github.com/amaancoderx) |
+| **Homepage** | [skillui.vercel.app](https://skillui.vercel.app) |
+| **Issues** | [GitHub Issues](https://github.com/amaancoderx/npxskillui/issues) |
+
+</div>
+
+### Version History
+
+<details>
+<summary>View all 23 releases</summary>
+
+| Version | Released |
+|---|---|
+| `1.3.2` ⬅ latest | April 10, 2026 |
+| `1.3.1` | April 10, 2026 |
+| `1.3.0` | April 10, 2026 |
+| `1.2.9` | April 10, 2026 |
+| `1.2.8` | April 10, 2026 |
+| `1.2.7` | April 10, 2026 |
+| `1.2.6` | April 10, 2026 |
+| `1.2.5` | April 10, 2026 |
+| `1.2.4` | April 10, 2026 |
+| `1.2.3` | April 10, 2026 |
+| `1.2.2` | April 10, 2026 |
+| `1.2.1` | April 9, 2026 |
+| `1.2.0` | April 9, 2026 |
+| `1.1.9` | April 9, 2026 |
+| `1.1.8` | April 9, 2026 |
+| `1.1.7` | April 9, 2026 |
+| `1.1.6` | April 9, 2026 |
+| `1.1.5` | April 9, 2026 |
+| `1.1.4` | April 8, 2026 |
+| `1.1.3` | April 8, 2026 |
+| `1.1.2` | April 8, 2026 |
+| `1.1.1` | April 8, 2026 |
+| `1.1.0` | April 8, 2026 |
+
+</details>
+
+---
+
 ## How It Works
 
-SkillUI uses pure static analysis. No AI, no API keys, no cloud.
+SkillUI uses pure static analysis. No AI, no API keys, no cloud — everything runs locally.
 
-- **URL mode** — fetches HTML, crawls all linked CSS, extracts computed styles via Playwright DOM inspection
+- **URL mode** — fetches HTML, crawls all linked CSS files, extracts computed styles via Playwright DOM inspection
 - **Dir mode** — scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns
-- **Repo mode** — clones to a temp directory and runs dir mode
+- **Repo mode** — clones the repo to a temp directory and runs dir mode
 - **Ultra mode** — runs Playwright to capture scroll screenshots, detect animation libraries from `window.*` globals, extract `@keyframes` from `document.styleSheets`, capture hover/focus state diffs, fingerprint DOM components
 
 ---
@@ -214,9 +256,11 @@ SkillUI uses pure static analysis. No AI, no API keys, no cloud.
 
 - [npm package](https://www.npmjs.com/package/skillui)
 - [Landing page](https://skillui.vercel.app)
+- [Source code](https://github.com/amaancoderx/npxskillui)
+- [Issues](https://github.com/amaancoderx/npxskillui/issues)
 
 ---
 
 ## License
 
-MIT
+MIT — built by [Amaan](https://github.com/amaancoderx)
