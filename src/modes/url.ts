@@ -4,20 +4,25 @@ import { normalize } from '../normalizer';
 import { captureScreenshot } from '../screenshot';
 import { DesignProfile, RawTokens, ComponentInfo } from '../types';
 import { loadPlaywright } from '../playwright-loader';
+import { extractCookieHeader, StorageState } from '../login';
 
 /**
  * URL mode: crawl a live website and extract design tokens.
  *
  * Strategy:
- * 1. ALWAYS fetch HTML + linked CSS via HTTP (no Playwright needed)
- * 2. If Playwright is available, ALSO extract computed styles from live DOM
- * 3. Merge both token sets for maximum coverage
+ * 1. Accept pre-resolved auth state (login detection happens in cli.ts)
+ * 2. ALWAYS fetch HTML + linked CSS via HTTP (no Playwright needed)
+ * 3. If Playwright is available, ALSO extract computed styles from live DOM
+ * 4. Merge both token sets for maximum coverage
  */
-export async function runUrlMode(url: string, nameOverride?: string, skillDir?: string): Promise<{ profile: DesignProfile; screenshotPath: string | null; cssColorCount: number; cssFontCount: number; computedColorCount: number; hadPlaywright: boolean }> {
+export async function runUrlMode(url: string, nameOverride?: string, skillDir?: string, preAuthState?: StorageState | null): Promise<{ profile: DesignProfile; screenshotPath: string | null; cssColorCount: number; cssFontCount: number; computedColorCount: number; hadPlaywright: boolean; storageState: StorageState | null }> {
   const projectName = nameOverride || deriveUrlName(url);
 
-  // Step 1: HTTP-based extraction (always works, no Playwright)
-  const httpResult = await extractHttpCSSTokens(url, 5);
+  const storageState: StorageState | null = preAuthState || null;
+  const cookies: string | undefined = storageState ? extractCookieHeader(storageState, url) || undefined : undefined;
+
+  // Step 1: HTTP-based extraction (with cookies if authenticated)
+  const httpResult = await extractHttpCSSTokens(url, 5, cookies);
   const httpTokens = httpResult.tokens;
   const httpComponents = httpResult.components;
   const cssColorCount = httpTokens.colors.length;
@@ -31,7 +36,7 @@ export async function runUrlMode(url: string, nameOverride?: string, skillDir?: 
 
   if (hadPlaywright) {
     try {
-      computedTokens = await extractComputedTokens(url, 3);
+      computedTokens = await extractComputedTokens(url, 3, storageState);
       computedColorCount = computedTokens.colors.length;
     } catch { /* Playwright extraction failed, use CSS-only */ }
   }
@@ -56,7 +61,7 @@ export async function runUrlMode(url: string, nameOverride?: string, skillDir?: 
     screenshotPath = await captureScreenshot(url, skillDir);
   }
 
-  return { profile, screenshotPath, cssColorCount, cssFontCount, computedColorCount, hadPlaywright };
+  return { profile, screenshotPath, cssColorCount, cssFontCount, computedColorCount, hadPlaywright, storageState };
 }
 
 function mergeUrlTokens(http: RawTokens, computed: RawTokens | null): RawTokens {

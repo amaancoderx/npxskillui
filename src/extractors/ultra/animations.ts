@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { StorageState } from '../../types';
 import { loadPlaywright } from '../../playwright-loader';
 import {
   FullAnimationResult,
@@ -31,7 +32,9 @@ import {
  */
 export async function captureAnimations(
   url: string,
-  skillDir: string
+  skillDir: string,
+  storageState?: StorageState | null,
+  onProgress?: (step: string) => void
 ): Promise<FullAnimationResult> {
   const empty: FullAnimationResult = {
     keyframes: [],
@@ -46,6 +49,7 @@ export async function captureAnimations(
     lottieCount: 0,
   };
 
+  const log = onProgress || (() => {});
   const playwright = loadPlaywright();
   if (!playwright) return empty;
 
@@ -58,6 +62,7 @@ export async function captureAnimations(
       viewport: { width: 1440, height: 900 },
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...(storageState ? { storageState } : {}),
     });
 
     const page = await context.newPage();
@@ -73,6 +78,7 @@ export async function captureAnimations(
     await page.waitForTimeout(2000);
 
     // ── Phase 1: Extract CSS keyframes from document.styleSheets ──────────
+    log('Animations — extracting keyframes + libraries...');
     const keyframesRaw = await page.evaluate(() => {
       const result: Array<{
         name: string;
@@ -288,6 +294,7 @@ export async function captureAnimations(
     const libraries: DetectedLibrary[] = librariesRaw as DetectedLibrary[];
 
     // ── Phase 5: Video detection + first-frame capture ────────────────────
+    log('Animations — detecting videos + scroll patterns...');
     const videosRaw = await page.evaluate(() => {
       return Array.from(document.querySelectorAll('video')).map((v, i) => ({
         index: i + 1,
@@ -474,6 +481,7 @@ export async function captureAnimations(
     });
 
     // ── Phase 9: Scroll Journey Screenshots ───────────────────────────────
+    log('Animations — capturing scroll journey screenshots...');
     const scrollFrames: ScrollFrame[] = [];
     const scrollPercents = [0, 17, 33, 50, 67, 83, 100];
 

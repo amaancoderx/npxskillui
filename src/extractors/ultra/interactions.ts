@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { StorageState } from '../../types';
 import { InteractionRecord, StyleDiff, StyleSnapshot } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
 
@@ -35,13 +36,20 @@ const INTERACTIVE_SELECTORS: Array<{
  * - Simulate hover → capture screenshot + diff computed styles
  * - Simulate focus → capture screenshot + diff computed styles
  *
+ * Accepts a single URL or array of URLs — visits each page and captures
+ * interactions from all of them.
+ *
  * Saves screenshots to screens/states/
  * Returns InteractionRecord[] for INTERACTIONS.md generation.
  */
 export async function captureInteractions(
-  url: string,
-  skillDir: string
+  urls: string | string[],
+  skillDir: string,
+  storageState?: StorageState | null,
+  onProgress?: (step: string) => void
 ): Promise<InteractionRecord[]> {
+  const urlList = Array.isArray(urls) ? urls : [urls];
+  const log = onProgress || (() => {});
   const playwright = loadPlaywright();
   if (!playwright) return [];
 
@@ -56,9 +64,33 @@ export async function captureInteractions(
       viewport: { width: 1440, height: 900 },
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...(storageState ? { storageState } : {}),
     });
 
-    const page = await context.newPage();
+    for (let pi = 0; pi < urlList.length; pi++) {
+      const url = urlList[pi];
+      log(`Interactions — page ${pi + 1}/${urlList.length}: ${new URL(url).pathname}`);
+      const pageRecords = await captureInteractionsFromPage(context, url, statesDir, records.length);
+      records.push(...pageRecords);
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+
+  return records;
+}
+
+async function captureInteractionsFromPage(
+  context: any,
+  url: string,
+  statesDir: string,
+  indexOffset: number
+): Promise<InteractionRecord[]> {
+  const records: InteractionRecord[] = [];
+  let page: any;
+
+  try {
+    page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForTimeout(1500);
 
@@ -66,7 +98,7 @@ export async function captureInteractions(
       try {
         // Find up to 3 visible elements of this type
         const elements = await page.locator(selector).all();
-        const visible = [];
+        const visible: any[] = [];
         for (const el of elements) {
           try {
             const box = await el.boundingBox();
@@ -79,7 +111,8 @@ export async function captureInteractions(
 
         for (let i = 0; i < visible.length; i++) {
           const el = visible[i];
-          const prefix = `${type}-${i + 1}`;
+          const globalIdx = indexOffset + records.length + 1;
+          const prefix = `${type}-${globalIdx}`;
 
           try {
             // Get label text
@@ -133,16 +166,12 @@ export async function captureInteractions(
               : [];
 
             // Only record if there are actual visual changes
-            if (
-              hoverChanges.length > 0 ||
-              focusChanges.length > 0 ||
-              defaultFile
-            ) {
+            if (hoverChanges.length > 0 || focusChanges.length > 0) {
               records.push({
                 componentType: type,
                 label: label || type,
                 selector: `${selector}:nth-of-type(${i + 1})`,
-                index: i + 1,
+                index: globalIdx,
                 screenshots: {
                   default: `screens/states/${defaultFile}`,
                   hover: hoverFile ? `screens/states/${hoverFile}` : undefined,
@@ -158,9 +187,10 @@ export async function captureInteractions(
       } catch { /* selector failed — skip */ }
     }
 
-    await page.close();
+  } catch {
+    // Page failed — return what we have
   } finally {
-    await browser.close().catch(() => {});
+    await page?.close().catch(() => {});
   }
 
   return records;

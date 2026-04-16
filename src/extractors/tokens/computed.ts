@@ -1,11 +1,11 @@
-import { RawTokens } from '../../types';
+import { RawTokens, StorageState } from '../../types';
 import { loadPlaywright } from '../../playwright-loader';
 
 /**
  * URL mode: Extract computed styles from live DOM using Playwright.
  * Playwright is an optional peer dependency.
  */
-export async function extractComputedTokens(url: string, maxPages = 5): Promise<RawTokens> {
+export async function extractComputedTokens(url: string, maxPages = 5, storageState?: StorageState | null): Promise<RawTokens> {
   const tokens: RawTokens = {
     colors: [],
     fonts: [],
@@ -36,6 +36,7 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ...(storageState ? { storageState } : {}),
   });
 
   try {
@@ -239,7 +240,16 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
                 return '';
               }
             })
-            .filter(href => href.startsWith(origin) && !href.includes('#'));
+            .filter(href => {
+              if (!href.startsWith(origin)) return false;
+              // Allow hash routes (#/path) but skip same-page anchors
+              const hashIdx = href.indexOf('#');
+              if (hashIdx !== -1) {
+                const hash = href.slice(hashIdx);
+                if (!hash.startsWith('#/')) return false;
+              }
+              return true;
+            });
         }, currentUrl);
 
         for (const link of links.slice(0, 10)) {

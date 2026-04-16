@@ -1,3 +1,4 @@
+import { StorageState } from '../../types';
 import { DOMComponent } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
 
@@ -9,9 +10,18 @@ import { loadPlaywright } from '../../playwright-loader';
  * - Groups by normalized class fingerprint
  * - Extracts representative HTML snippet
  *
+ * Accepts a single URL or array of URLs — visits each page, merges
+ * and deduplicates components across all pages.
+ *
  * Requires Playwright (optional peer dependency).
  */
-export async function detectDOMComponents(url: string): Promise<DOMComponent[]> {
+export async function detectDOMComponents(
+  urls: string | string[],
+  storageState?: StorageState | null,
+  onProgress?: (step: string) => void
+): Promise<DOMComponent[]> {
+  const urlList = Array.isArray(urls) ? urls : [urls];
+  const log = onProgress || (() => {});
   const playwright = loadPlaywright();
   if (!playwright) return [];
 
@@ -21,9 +31,41 @@ export async function detectDOMComponents(url: string): Promise<DOMComponent[]> 
       viewport: { width: 1440, height: 900 },
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...(storageState ? { storageState } : {}),
     });
 
-    const page = await context.newPage();
+    const allComponents: DOMComponent[] = [];
+
+    for (let pi = 0; pi < urlList.length; pi++) {
+      const url = urlList[pi];
+      log(`Components — page ${pi + 1}/${urlList.length}: ${new URL(url).pathname}`);
+      const pageComponents = await extractComponentsFromPage(context, url);
+      allComponents.push(...pageComponents);
+    }
+
+    // Merge: deduplicate by pattern, sum instance counts
+    const merged = new Map<string, DOMComponent>();
+    for (const comp of allComponents) {
+      const existing = merged.get(comp.pattern);
+      if (existing) {
+        existing.instances += comp.instances;
+      } else {
+        merged.set(comp.pattern, { ...comp });
+      }
+    }
+
+    return Array.from(merged.values())
+      .sort((a, b) => b.instances - a.instances)
+      .slice(0, 20);
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+async function extractComponentsFromPage(context: any, url: string): Promise<DOMComponent[]> {
+  let page: any;
+  try {
+    page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForTimeout(1000);
 
@@ -139,12 +181,10 @@ export async function detectDOMComponents(url: string): Promise<DOMComponent[]> 
       return results.sort((a, b) => b.instances - a.instances);
     });
 
-    await page.close();
-    await browser.close();
-
     return components;
   } catch {
-    await browser.close().catch(() => {});
     return [];
+  } finally {
+    await page?.close().catch(() => {});
   }
 }

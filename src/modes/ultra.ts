@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { DesignProfile } from '../types';
+import { DesignProfile, StorageState } from '../types';
 import { UltraOptions, UltraResult, FullAnimationResult } from '../types-ultra';
 import { capturePageScreenshots } from '../extractors/ultra/pages';
 import { captureInteractions } from '../extractors/ultra/interactions';
@@ -36,8 +36,11 @@ export async function runUltraMode(
   url: string,
   profile: DesignProfile,
   skillDir: string,
-  opts: UltraOptions
+  opts: UltraOptions,
+  storageState?: StorageState | null,
+  onProgress?: (step: string) => void
 ): Promise<UltraResult> {
+  const log = onProgress || (() => {});
   // Ensure all output directories exist
   fs.mkdirSync(path.join(skillDir, 'screens', 'pages'), { recursive: true });
   fs.mkdirSync(path.join(skillDir, 'screens', 'sections'), { recursive: true });
@@ -49,8 +52,7 @@ export async function runUltraMode(
   const hasPlaywright = loadPlaywright() !== null;
 
   if (!hasPlaywright) {
-    process.stdout.write('\n  ⚠  Playwright not found — ultra visual features skipped\n');
-    process.stdout.write('     Fix: npm install -g playwright && npx playwright install chromium\n\n');
+    log('Playwright not found — ultra visual features skipped');
     writeTokensJson(profile, skillDir);
     writeStubs(skillDir);
     const emptyAnim = emptyAnimResult();
@@ -58,21 +60,34 @@ export async function runUltraMode(
   }
 
   // ── Step 1: Animation extraction (scroll journey + keyframes + libraries) ──
-  const animations = await captureAnimations(url, skillDir);
+  log('Step 1/6 — Scroll journey + animations...');
+  const animations = await captureAnimations(url, skillDir, storageState, log);
 
   // ── Step 2: Multi-page screenshots + section clips ─────────────────────
-  const { pages, sections } = await capturePageScreenshots(url, skillDir, opts.screens);
+  log('Step 2/6 — Page screenshots + SPA discovery...');
+  const { pages, sections } = await capturePageScreenshots(url, skillDir, opts.screens, storageState, log);
 
-  // ── Step 3: Micro-interactions ────────────────────────────────────────
-  const interactions = await captureInteractions(url, skillDir);
+  // Collect all discovered URLs for cross-page extraction
+  const discoveredUrls = pages.length > 0
+    ? pages.map(p => p.url)
+    : [url];
 
-  // ── Step 4: Layout extraction ──────────────────────────────────────────
-  const layouts = await extractLayouts(url);
+  const urlCount = discoveredUrls.length;
 
-  // ── Step 5: DOM component detection ───────────────────────────────────
-  const domComponents = await detectDOMComponents(url);
+  // ── Step 3: Micro-interactions (across all discovered pages) ──────────
+  log(`Step 3/6 — Interactions (${urlCount} pages)...`);
+  const interactions = await captureInteractions(discoveredUrls, skillDir, storageState, log);
+
+  // ── Step 4: Layout extraction (across all discovered pages) ───────────
+  log(`Step 4/6 — Layout extraction (${urlCount} pages)...`);
+  const layouts = await extractLayouts(discoveredUrls, storageState, log);
+
+  // ── Step 5: DOM component detection (across all discovered pages) ─────
+  log(`Step 5/6 — Component detection (${urlCount} pages)...`);
+  const domComponents = await detectDOMComponents(discoveredUrls, storageState, log);
 
   // ── Step 6: Write all reference files ─────────────────────────────────
+  log('Step 6/6 — Writing reference files...');
 
   const refsDir = path.join(skillDir, 'references');
 
@@ -101,11 +116,6 @@ export async function runUltraMode(
 
   // Ultra screenshot index
   writeScreensIndex(pages, sections, animations, skillDir);
-
-  console.log(' ✓');
-
-  // ── Print ultra summary ────────────────────────────────────────────────
-  printUltraSummary(animations);
 
   return { pageScreenshots: pages, sectionScreenshots: sections, interactions, layouts, domComponents, animations };
 }
@@ -187,20 +197,6 @@ function generateVisualGuideMd(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-function printUltraSummary(anim: FullAnimationResult): void {
-  const libs = anim.libraries.map(l => l.name).join(', ') || 'none';
-  console.log('');
-  console.log(`  Animation Stack: ${libs}`);
-  if (anim.webglDetected) console.log(`  WebGL/3D: detected (${anim.canvasCount} canvas elements)`);
-  if (anim.videos.length > 0) {
-    const bg = anim.videos.filter(v => v.role === 'background').length;
-    console.log(`  Video: ${anim.videos.length} elements (${bg} background)`);
-  }
-  if (anim.lottieCount > 0) console.log(`  Lottie: ${anim.lottieCount} players`);
-  if (anim.keyframes.length > 0) console.log(`  Keyframes: ${anim.keyframes.length} extracted`);
-  if (anim.scrollPatterns.length > 0) console.log(`  Scroll patterns: ${anim.scrollPatterns.length} types`);
-}
 
 function writeScreensIndex(
   pages: import('../types-ultra').PageScreenshot[],
