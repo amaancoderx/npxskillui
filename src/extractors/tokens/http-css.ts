@@ -13,7 +13,7 @@ export interface HttpExtractionResult {
   components: ComponentInfo[];
 }
 
-export async function extractHttpCSSTokens(url: string, maxPages = 3): Promise<HttpExtractionResult> {
+export async function extractHttpCSSTokens(url: string, maxPages = 3, cookies?: string): Promise<HttpExtractionResult> {
   const tokens: RawTokens = {
     colors: [],
     fonts: [],
@@ -53,7 +53,7 @@ export async function extractHttpCSSTokens(url: string, maxPages = 3): Promise<H
     visited.add(currentUrl);
 
     try {
-      const html = await fetchText(currentUrl);
+      const html = await fetchText(currentUrl, cookies);
       if (!html) continue;
       allHtml.push(html);
 
@@ -94,7 +94,7 @@ export async function extractHttpCSSTokens(url: string, maxPages = 3): Promise<H
         if (fetchedCss.has(cssUrl)) continue;
         fetchedCss.add(cssUrl);
         try {
-          const cssContent = await fetchText(cssUrl);
+          const cssContent = await fetchText(cssUrl, cookies);
           if (cssContent) {
             allCssContent.push(cssContent);
             parseCSS(cssContent, tokens, cssUrl);
@@ -823,11 +823,14 @@ function extractTransitionParts(value: string, tokens: RawTokens): void {
 
 function extractPageLinks(html: string, baseUrl: string, origin: string): string[] {
   const links: string[] = [];
-  const hrefMatches = html.matchAll(/<a[^>]+href\s*=\s*["']([^"'#]+)["']/gi);
+  const hrefMatches = html.matchAll(/<a[^>]+href\s*=\s*["']([^"']+)["']/gi);
   for (const m of hrefMatches) {
     try {
       const resolved = new URL(m[1], baseUrl).href;
-      if (resolved.startsWith(origin) && !resolved.includes('#') && !links.includes(resolved)) {
+      // Allow hash routes (#/path) but skip same-page anchors
+      const hashIdx = resolved.indexOf('#');
+      const hasBlockingHash = hashIdx !== -1 && !resolved.slice(hashIdx).startsWith('#/');
+      if (resolved.startsWith(origin) && !hasBlockingHash && !links.includes(resolved)) {
         links.push(resolved);
       }
     } catch {
@@ -1596,17 +1599,20 @@ function buildDarkModePairs(tokens: RawTokens): void {
 
 // ── Utility Helpers ───────────────────────────────────────────────────
 
-async function fetchText(url: string): Promise<string | null> {
+async function fetchText(url: string, cookies?: string): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (compatible; skillui/1.0; +https://github.com/amaanbuilds/skillui)',
+      'Accept': 'text/html,text/css,application/xhtml+xml,*/*',
+    };
+    if (cookies) headers['Cookie'] = cookies;
+
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; skillui/1.0; +https://github.com/amaanbuilds/skillui)',
-        'Accept': 'text/html,text/css,application/xhtml+xml,*/*',
-      },
+      headers,
       redirect: 'follow',
     });
 

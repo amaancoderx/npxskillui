@@ -1,3 +1,4 @@
+import { StorageState } from '../../types';
 import { LayoutRecord } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
 
@@ -9,10 +10,19 @@ import { loadPlaywright } from '../../playwright-loader';
  * - section-level wrappers
  * - nav/header/footer
  *
+ * Accepts a single URL or array of URLs — visits each page, merges
+ * and deduplicates layout records across all pages.
+ *
  * Returns LayoutRecord[] for LAYOUT.md generation.
  * Requires Playwright (optional peer dependency).
  */
-export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
+export async function extractLayouts(
+  urls: string | string[],
+  storageState?: StorageState | null,
+  onProgress?: (step: string) => void
+): Promise<LayoutRecord[]> {
+  const urlList = Array.isArray(urls) ? urls : [urls];
+  const log = onProgress || (() => {});
   const playwright = loadPlaywright();
   if (!playwright) return [];
 
@@ -22,9 +32,40 @@ export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
       viewport: { width: 1440, height: 900 },
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ...(storageState ? { storageState } : {}),
     });
 
-    const page = await context.newPage();
+    const allRecords: LayoutRecord[] = [];
+
+    for (let pi = 0; pi < urlList.length; pi++) {
+      const url = urlList[pi];
+      log(`Layout — page ${pi + 1}/${urlList.length}: ${new URL(url).pathname}`);
+      const pageRecords = await extractLayoutsFromPage(context, url);
+      allRecords.push(...pageRecords);
+    }
+
+    // Deduplicate by selector — keep first occurrence
+    const seen = new Set<string>();
+    const deduped: LayoutRecord[] = [];
+    for (const rec of allRecords) {
+      if (!seen.has(rec.selector)) {
+        seen.add(rec.selector);
+        deduped.push(rec);
+      }
+    }
+
+    return deduped
+      .sort((a, b) => a.depth - b.depth)
+      .slice(0, 40);
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+async function extractLayoutsFromPage(context: any, url: string): Promise<LayoutRecord[]> {
+  let page: any;
+  try {
+    page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForTimeout(1000);
 
@@ -117,11 +158,10 @@ export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
       return results.sort((a, b) => a.depth - b.depth).slice(0, 40);
     });
 
-    await page.close();
-    await browser.close();
     return records;
   } catch {
-    await browser.close().catch(() => {});
     return [];
+  } finally {
+    await page?.close().catch(() => {});
   }
 }

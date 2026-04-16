@@ -248,6 +248,24 @@ export interface MotionTokens {
 
 // ── CLI Options ──────────────────────────────────────────────────────
 
+/** Playwright storage-state shape (cookies + origins with localStorage). */
+export interface StorageState {
+  cookies: Array<{
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    expires: number;
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: 'Strict' | 'Lax' | 'None';
+  }>;
+  origins: Array<{
+    origin: string;
+    localStorage: Array<{ name: string; value: string }>;
+  }>;
+}
+
 export interface CLIOptions {
   dir?: string;
   repo?: string;
@@ -258,4 +276,7 @@ export interface CLIOptions {
   format: 'design-md' | 'skill' | 'both';
   mode: 'default' | 'ultra';
   screens: string;
+  user?: string;
+  pass?: string;
+  login?: boolean;
 }

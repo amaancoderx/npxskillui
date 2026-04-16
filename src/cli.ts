@@ -19,9 +19,34 @@ import {
   showUltraPlaywrightError,
   showResults,
   runInteractivePrompts,
+  promptLoginCredentials,
+  showLoginSuccess,
+  showLoginFailed,
 } from './ui.js';
+import { detectLoginPage, detectLoginPageWithPlaywright, performLogin, extractCookieHeader, StorageState } from './login.js';
+import { loadPlaywright } from './playwright-loader.js';
 
 const program = new Command();
+
+// Ensure Ctrl+C kills the process even when Playwright browsers are running.
+// Playwright child processes (Chromium) can keep the event loop alive and
+// prevent a clean process.exit(). We use SIGKILL as a fallback.
+process.on('SIGINT', () => {
+  process.stderr.write('\n  Interrupted — shutting down...\n');
+  // Give 3s for graceful cleanup, then force-kill
+  const forceTimer = setTimeout(() => {
+    process.kill(process.pid, 'SIGKILL');
+  }, 3000);
+  forceTimer.unref();
+  process.exit(130);
+});
+process.on('SIGTERM', () => {
+  const forceTimer = setTimeout(() => {
+    process.kill(process.pid, 'SIGKILL');
+  }, 3000);
+  forceTimer.unref();
+  process.exit(143);
+});
 
 program
   .name('skillui')
@@ -36,6 +61,9 @@ program
   .option('--format <format>', 'Output format: design-md | skill | both', 'both')
   .option('--mode <mode>', 'Extraction mode: default | ultra', 'default')
   .option('--screens <number>', 'Ultra mode: max pages to crawl (default: 5)', '5')
+  .option('--user <string>', 'Login username or email (for authenticated sites)')
+  .option('--pass <string>', 'Login password (for authenticated sites)')
+  .option('--login', 'Force login prompt (skip auto-detection)')
   .action(async (opts: CLIOptions) => {
     // Always show the logo on every command
     await showLogo();
@@ -63,6 +91,7 @@ program
     try {
       let profile: DesignProfile;
       let screenshotPath: string | null = null;
+      let storageState: StorageState | null = null;
 
       const outputDir = path.resolve(opts.out);
       fs.mkdirSync(outputDir, { recursive: true });
@@ -101,10 +130,76 @@ program
         const skillDir = path.join(outputDir, `${safeName}-design`);
         fs.mkdirSync(path.join(skillDir, 'screenshots'), { recursive: true });
 
+        // ── Login detection + auth (BEFORE spinner) ──────────────────
+        // Support SKILLUI_USER / SKILLUI_PASSWORD env vars (avoids exposing creds in ps)
+        const authUser = opts.user || process.env.SKILLUI_USER;
+        const authPass = opts.pass || process.env.SKILLUI_PASSWORD;
+        const preAuthCreds = authUser && authPass ? { username: authUser, password: authPass } : undefined;
+
+        if (opts.login) {
+          // --login flag: skip detection, prompt immediately
+          const creds = preAuthCreds || await promptLoginCredentials();
+          if (creds) {
+            const spLogin = startSpinner('Authenticating...');
+            storageState = await performLogin(opts.url!, creds);
+            if (storageState) {
+              succeedSpinner(spLogin, 'Login', 'authenticated successfully');
+              showLoginSuccess(opts.url!);
+            } else {
+              failSpinner(spLogin, 'Login', 'authentication failed — continuing without auth');
+              showLoginFailed();
+            }
+          }
+        } else {
+          // Auto-detect login page
+          let loginUrl: string | null = null;
+
+          const spDetect = startSpinner('Checking for login page...');
+          try {
+            // Pass 1: HTTP fetch
+            const checkRes = await fetch(opts.url!, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; skillui/1.0)', 'Accept': 'text/html' },
+              redirect: 'follow',
+              signal: AbortSignal.timeout(10000),
+            });
+            if (checkRes.ok) {
+              const checkHtml = await checkRes.text();
+              if (detectLoginPage(checkHtml, checkRes.url)) {
+                loginUrl = checkRes.url;
+              }
+            }
+          } catch { /* pre-flight failed */ }
+
+          // Pass 2: Playwright-based SPA detection
+          if (!loginUrl && loadPlaywright()) {
+            loginUrl = await detectLoginPageWithPlaywright(opts.url!);
+          }
+
+          if (loginUrl) {
+            succeedSpinner(spDetect, 'Login detected', loginUrl);
+            // Prompt for credentials (no spinner running — input fields visible)
+            const creds = preAuthCreds || await promptLoginCredentials();
+            if (creds) {
+              const spLogin = startSpinner('Authenticating...');
+              storageState = await performLogin(loginUrl, creds);
+              if (storageState) {
+                succeedSpinner(spLogin, 'Login', 'authenticated successfully');
+                showLoginSuccess(opts.url!);
+              } else {
+                failSpinner(spLogin, 'Login', 'authentication failed — continuing without auth');
+                showLoginFailed();
+              }
+            }
+          } else {
+            succeedSpinner(spDetect, 'Login check', 'no login page detected');
+          }
+        }
+
+        // ── Extraction (with auth if available) ──────────────────────
         const sp1 = startSpinner('Fetching HTML + CSS...');
         let urlResult: Awaited<ReturnType<typeof runUrlMode>>;
         try {
-          urlResult = await runUrlMode(opts.url!, opts.name, skillDir);
+          urlResult = await runUrlMode(opts.url!, opts.name, skillDir, storageState);
           const { cssColorCount, cssFontCount, computedColorCount, hadPlaywright } = urlResult;
           const detail = hadPlaywright
             ? `${cssColorCount} CSS colors · ${computedColorCount} computed · ${cssFontCount} fonts`
@@ -120,6 +215,7 @@ program
         }
         profile = urlResult.profile;
         screenshotPath = urlResult.screenshotPath;
+        storageState = urlResult.storageState || storageState;
       }
 
       // ── Ultra mode (URL only) ──────────────────────────────────────
@@ -140,7 +236,9 @@ program
         } else {
           const spAnim = startSpinner('Capturing scroll journey + animations...');
           try {
-            const ultraResult = await runUltraMode(opts.url!, profile, skillDir, { screens: ultraScreens });
+            const ultraResult = await runUltraMode(opts.url!, profile, skillDir, { screens: ultraScreens }, storageState, (step) => {
+              spAnim.text = step;
+            });
             ultraAnimations = ultraResult.animations;
             const kf = ultraAnimations.keyframes.length;
             const sf = ultraAnimations.scrollFrames.length;

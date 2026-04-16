@@ -426,3 +426,48 @@ export async function runInteractivePrompts(): Promise<InteractiveAnswers | null
   console.log('');
   return answers;
 }
+
+// ── Section 11: Login credential prompts ─────────────────────────────
+
+export async function promptLoginCredentials(): Promise<{ username: string; password: string } | null> {
+  const prompts = (await import('prompts')).default;
+
+  console.log('');
+  console.log(boxen(
+    chalk.yellow.bold('  Login page detected\n\n') +
+    chalk.white('  The target URL requires authentication.\n') +
+    chalk.dim('  Enter credentials to log in and continue extraction.'),
+    {
+      title: chalk.bold.yellow(' Authentication Required '),
+      borderStyle: 'round',
+      borderColor: 'yellow',
+      width: 76,
+      padding: { top: 0, bottom: 0, left: 0, right: 1 },
+    }
+  ));
+  console.log('');
+
+  const answers = await prompts([
+    {
+      type: 'text',
+      name: 'username',
+      message: chalk.white('Username or email:'),
+    },
+    {
+      type: 'password',
+      name: 'password',
+      message: chalk.white('Password:'),
+    },
+  ], { onCancel: () => process.exit(0) });
+
+  if (!answers.username || !answers.password) return null;
+  return { username: answers.username, password: answers.password };
+}
+
+export function showLoginSuccess(url: string): void {
+  console.log('  ' + chalk.green('\u2713') + '  ' + chalk.white('Authenticated') + '  ' + chalk.dim(url));
+}
+
+export function showLoginFailed(): void {
+  console.log('  ' + chalk.red('\u2717') + '  ' + chalk.white('Login failed') + '  ' + chalk.dim('Check credentials and try again'));
+}
