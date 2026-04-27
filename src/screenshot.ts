@@ -16,8 +16,10 @@ export async function captureScreenshot(
     const screenshotsDir = path.join(skillDir, 'screenshots');
     fs.mkdirSync(screenshotsDir, { recursive: true });
 
-    // microlink.io with embed=screenshot.url returns the image bytes directly
-    const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url&waitFor=2000`;
+    // microlink.io with embed=screenshot.url returns the image bytes directly.
+    // screenshot.fullPage=true captures the entire scrollable page rather than
+    // just the 1280×720 viewport.
+    const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url&waitFor=2000&screenshot.fullPage=true`;
 
     const res = await fetch(apiUrl, {
       headers: { 'User-Agent': 'skillui/1.0' },

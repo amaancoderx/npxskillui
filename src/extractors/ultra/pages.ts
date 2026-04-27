@@ -52,7 +52,13 @@ export async function capturePageScreenshots(
 
       try {
         const page = await context.newPage();
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+        await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+        try {
+          await page.waitForLoadState('networkidle', { timeout: 8000 });
+        } catch {
+          // networkidle is unreliable on sites with chat / bot-protection /
+          // tracking pixels that hold connections open indefinitely.
+        }
         await page.waitForTimeout(1500);
 
         // Full-page screenshot

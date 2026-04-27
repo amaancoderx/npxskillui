@@ -69,7 +69,13 @@ export async function captureAnimations(
       (window as any).__claudeui_originalRAF = window.requestAnimationFrame;
     });
 
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 8000 });
+    } catch {
+      // networkidle is unreliable on sites with chat / bot-protection /
+      // tracking pixels that hold connections open indefinitely.
+    }
     await page.waitForTimeout(2000);
 
     // ── Phase 1: Extract CSS keyframes from document.styleSheets ──────────
