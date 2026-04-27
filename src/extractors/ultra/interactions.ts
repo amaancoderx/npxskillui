@@ -59,7 +59,13 @@ export async function captureInteractions(
     });
 
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 8000 });
+    } catch {
+      // Sites with chat widgets, Cloudflare Turnstile, or remarketing pixels
+      // hold connections open indefinitely. Proceed once `load` has fired.
+    }
     await page.waitForTimeout(1500);
 
     for (const { type, selector } of INTERACTIVE_SELECTORS) {

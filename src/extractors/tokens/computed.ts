@@ -49,7 +49,13 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
 
       try {
         const page = await context.newPage();
-        await page.goto(currentUrl, { waitUntil: 'networkidle', timeout: 20000 });
+        await page.goto(currentUrl, { waitUntil: 'load', timeout: 60000 });
+        try {
+          await page.waitForLoadState('networkidle', { timeout: 8000 });
+        } catch {
+          // networkidle is unreliable on sites with chat / bot-protection /
+          // tracking pixels that hold connections open indefinitely.
+        }
 
         // Wait a moment for any JS-rendered content
         await page.waitForTimeout(1500);

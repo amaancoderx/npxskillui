@@ -25,7 +25,13 @@ export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
     });
 
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 8000 });
+    } catch {
+      // See note in interactions.ts — networkidle is unreliable on modern
+      // sites. Fall back to `load` so the run continues.
+    }
     await page.waitForTimeout(1000);
 
     const records: LayoutRecord[] = await page.evaluate(() => {
