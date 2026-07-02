@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { InteractionRecord, StyleDiff, StyleSnapshot } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { dismissCookieOverlays } from '../../cookie-dismiss';
 
 const TRACKED_PROPS: (keyof StyleSnapshot)[] = [
   'backgroundColor',
@@ -59,6 +60,7 @@ export async function captureInteractions(
     });
 
     const page = await context.newPage();
+    await dismissCookieOverlays(page);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(3000);
 

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadPlaywright } from '../../playwright-loader';
+import { dismissCookieOverlays } from '../../cookie-dismiss';
 import {
   FullAnimationResult,
   ExtractedKeyframe,
@@ -61,6 +62,7 @@ export async function captureAnimations(
     });
 
     const page = await context.newPage();
+    await dismissCookieOverlays(page);
 
     // Disable CSS animations for initial load (avoids capturing mid-animation state)
     // We'll re-enable them before scroll capture
