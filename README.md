@@ -77,6 +77,8 @@ skillui --url https://linear.app
 
 Uses Playwright to capture scroll screenshots, interaction diffs, animation detection, layout analysis, and DOM component fingerprinting.
 
+Cookie/consent banners (Cookiebot, OneTrust, Osano, TrustArc, …) are automatically dismissed before capture, so screenshots and extracted tokens reflect the real page — not a consent overlay.
+
 ```bash
 skillui --url https://linear.app --mode ultra
 ```
@@ -114,6 +116,7 @@ skillui --repo https://github.com/org/repo
 | CSS keyframes + animation detection | | ✅ |
 | Flex/grid layout extraction | | ✅ |
 | DOM component fingerprinting | | ✅ |
+| Cookie / consent overlay auto-dismiss | ✅ | ✅ |
 
 ---
 
@@ -244,6 +247,8 @@ SkillUI uses pure static analysis. No AI, no API keys, no cloud - everything run
 - **Dir mode** - scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns
 - **Repo mode** - clones the repo to a temp directory and runs dir mode
 - **Ultra mode** - runs Playwright to capture scroll screenshots, detect animation libraries from `window.*` globals, extract `@keyframes` from `document.styleSheets`, capture hover/focus state diffs, fingerprint DOM components
+
+Whenever a page is loaded in a browser (URL and ultra modes), a page-init hook removes known cookie/consent (CMP) banner nodes as they appear — via a `MutationObserver` that re-removes on re-injection — so the captured page is the real design, not a consent overlay. Pure client-side DOM pruning: no clicks, no network, no page-data reads.
 
 ---
 
