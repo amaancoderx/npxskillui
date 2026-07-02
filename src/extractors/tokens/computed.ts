@@ -1,5 +1,6 @@
 import { RawTokens } from '../../types';
 import { loadPlaywright } from '../../playwright-loader';
+import { dismissCookieOverlays } from '../../cookie-dismiss';
 
 /**
  * URL mode: Extract computed styles from live DOM using Playwright.
@@ -49,6 +50,7 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
 
       try {
         const page = await context.newPage();
+        await dismissCookieOverlays(page);
         await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
         // Wait a moment for any JS-rendered content

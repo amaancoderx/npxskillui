@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PageScreenshot, SectionScreenshot } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { dismissCookieOverlays } from '../../cookie-dismiss';
 
 /**
  * Ultra mode — Page & Section Screenshots
@@ -52,6 +53,7 @@ export async function capturePageScreenshots(
 
       try {
         const page = await context.newPage();
+        await dismissCookieOverlays(page);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForTimeout(3000);
 

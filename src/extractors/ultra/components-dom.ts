@@ -1,5 +1,6 @@
 import { DOMComponent } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { dismissCookieOverlays } from '../../cookie-dismiss';
 
 /**
  * Ultra mode — DOM Component Detector
@@ -24,6 +25,7 @@ export async function detectDOMComponents(url: string): Promise<DOMComponent[]> 
     });
 
     const page = await context.newPage();
+    await dismissCookieOverlays(page);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(3000);
 
