@@ -1680,7 +1680,7 @@ function isColorVarName(name: string): boolean {
 }
 
 function isGenericFont(f: string): boolean {
-  return /^(sans-serif|serif|monospace|cursive|fantasy|system-ui|ui-sans-serif|ui-serif|ui-monospace|inherit|initial|unset)$/i.test(f);
+  return /^(sans-serif|serif|monospace|cursive|fantasy|system-ui|ui-sans-serif|ui-serif|ui-monospace|ui-rounded|math|emoji|fangsong|inherit|initial|unset|revert|revert-layer|normal|none)$/i.test(f);
 }
 
 function isValidFontName(f: string): boolean {

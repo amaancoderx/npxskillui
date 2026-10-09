@@ -6,6 +6,29 @@ import { RawTokens, CSSVariable, AnimationToken, DarkModeVar } from '../../types
 const CSS_EXTENSIONS = ['.css', '.scss', '.less'];
 const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '.nuxt'];
 
+// CSS-wide keywords and generic families that are not real typefaces.
+// Without this filter, `button { font-family: inherit; }` would report a
+// font family literally named "inherit" in DESIGN.md.
+const NON_FONT_KEYWORDS = new Set([
+  'inherit', 'initial', 'unset', 'revert', 'revert-layer',
+  'none', 'normal',
+  'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy',
+  'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded',
+  'math', 'emoji', 'fangsong',
+]);
+
+// Pick the first real font family from a `font-family` value, e.g.
+// `'Poppins', "Segoe UI", sans-serif` -> `Poppins`.
+function pickFontFamily(value: string): string {
+  return (
+    value
+      .replace(/["']/g, '')
+      .split(',')
+      .map(s => s.trim())
+      .find(s => s && !NON_FONT_KEYWORDS.has(s.toLowerCase())) || ''
+  );
+}
+
 export function extractCSSTokens(projectDir: string): RawTokens {
   const tokens: RawTokens = {
     colors: [],
@@ -118,7 +141,7 @@ function extractFromCSS(content: string, tokens: RawTokens): void {
 
         // Font family
         if (prop === 'font-family') {
-          const family = rawValue.replace(/["']/g, '').split(',')[0].trim();
+          const family = pickFontFamily(rawValue);
           if (family) {
             tokens.fonts.push({ family, source: 'css' });
           }
@@ -174,19 +197,20 @@ function extractFromCSS(content: string, tokens: RawTokens): void {
       },
     });
 
-    // Extract @media breakpoints
+    // Extract @media breakpoints (both mobile-first `min-width` and
+    // desktop-first `max-width` queries)
     csstree.walk(ast, {
       visit: 'Atrule',
       enter(node: csstree.Atrule) {
         if (node.name === 'media' && node.prelude) {
           const mediaQuery = csstree.generate(node.prelude);
-          const minWidthMatch = mediaQuery.match(/min-width:\s*([\d.]+(?:px|em|rem))/);
-          if (minWidthMatch) {
-            const existing = tokens.breakpoints.find(bp => bp.value === minWidthMatch[1]);
+          const bpMatch = mediaQuery.match(/(?:min|max)-width:\s*([\d.]+(?:px|em|rem))/);
+          if (bpMatch) {
+            const existing = tokens.breakpoints.find(bp => bp.value === bpMatch[1]);
             if (!existing) {
               tokens.breakpoints.push({
-                name: `breakpoint-${minWidthMatch[1]}`,
-                value: minWidthMatch[1],
+                name: `breakpoint-${bpMatch[1]}`,
+                value: bpMatch[1],
                 source: 'css',
               });
             }
@@ -351,14 +375,14 @@ function extractWithRegex(content: string, tokens: RawTokens): void {
   // Font families
   const fontMatches = content.matchAll(/font-family\s*:\s*([^;}\n]+)/g);
   for (const m of fontMatches) {
-    const family = m[1].replace(/["']/g, '').split(',')[0].trim();
+    const family = pickFontFamily(m[1]);
     if (family) {
       tokens.fonts.push({ family, source: 'css' });
     }
   }
 
-  // Media queries
-  const mediaMatches = content.matchAll(/@media[^{]*min-width:\s*([\d.]+(?:px|em|rem))/g);
+  // Media queries (both min-width and max-width)
+  const mediaMatches = content.matchAll(/@media[^{]*(?:min|max)-width:\s*([\d.]+(?:px|em|rem))/g);
   for (const m of mediaMatches) {
     if (!tokens.breakpoints.find(bp => bp.value === m[1])) {
       tokens.breakpoints.push({

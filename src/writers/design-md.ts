@@ -689,7 +689,7 @@ No breakpoints detected. Consider adding responsive breakpoints to the design sy
     content += `\n**Approach:** Mobile-first using Tailwind responsive prefixes (\`sm:\`, \`md:\`, \`lg:\`, \`xl:\`, \`2xl:\`).\n`;
     content += 'Always design for mobile first, then layer on responsive overrides.\n';
   } else {
-    content += '\n**Approach:** Use `@media (min-width: ...)` queries matching the breakpoints above.\n';
+    content += '\n**Approach:** Use `@media (min-width: ...)` or `@media (max-width: ...)` queries matching the breakpoints above.\n';
   }
 
   return `## 9. Responsive Behavior
