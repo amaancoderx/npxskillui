@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { InteractionRecord, StyleDiff, StyleSnapshot } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, openPage } from '../../browser-target';
 
 const TRACKED_PROPS: (keyof StyleSnapshot)[] = [
   'backgroundColor',
@@ -40,7 +41,8 @@ const INTERACTIVE_SELECTORS: Array<{
  */
 export async function captureInteractions(
   url: string,
-  skillDir: string
+  skillDir: string,
+  session?: InteractiveSession
 ): Promise<InteractionRecord[]> {
   const playwright = loadPlaywright();
   if (!playwright) return [];
@@ -50,18 +52,9 @@ export async function captureInteractions(
 
   const records: InteractionRecord[] = [];
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  const target = await openPage(playwright, url, { session, settleMs: 3000 });
+  const { page } = target;
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
-
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
-
     for (const { type, selector } of INTERACTIVE_SELECTORS) {
       try {
         // Find up to 3 visible elements of this type
@@ -158,9 +151,8 @@ export async function captureInteractions(
       } catch { /* selector failed — skip */ }
     }
 
-    await page.close();
   } finally {
-    await browser.close().catch(() => {});
+    await target.dispose();
   }
 
   return records;

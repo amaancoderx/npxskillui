@@ -81,6 +81,29 @@ Uses Playwright to capture scroll screenshots, interaction diffs, animation dete
 skillui --url https://linear.app --mode ultra
 ```
 
+### Interactive mode - prepare the page first
+
+Some sites hide their real design behind a cookie banner, a consent wall, or a sign-in gate. Add `--interactive` to open the site in a visible browser and prepare it yourself before extraction starts:
+
+```bash
+skillui --url https://example.com --interactive
+```
+
+1. A Chromium window opens at the URL and waits. Nothing is clicked for you.
+2. Dismiss cookie banners, close overlays, accept consent you agree to, click continue buttons, and navigate to the content you want analyzed.
+3. Press Enter in the terminal. Extraction then runs on that same tab, so its cookies, navigation, and DOM are kept.
+4. If the site opened new tabs while you prepared, you choose which one to extract.
+
+`--interactive` requires `--url` and implies `--mode ultra`. Press Ctrl+C in the terminal to cancel. If the browser window is closed, or no answer comes within 15 minutes, extraction stops and the browser closes. Without `--interactive`, nothing changes.
+
+Limits:
+
+- Ultra's page crawl (`--screens`) starts from the prepared tab. Other pages it visits open in the same browser context, so they share cookies, but they do not keep your page state.
+- Stylesheets linked from the page are downloaded over plain HTTP, so stylesheets that need your session are skipped. Browser-observed styles from the prepared page are still captured.
+- The design screenshot (`screenshots/homepage.png`) is a capture of the prepared viewport.
+- Interactive mode is a command-line flag only. The no-argument prompts do not ask for it.
+- It needs a display. On a headless server, run it under a virtual display such as `xvfb-run`.
+
 ### Dir mode - local project scan
 
 Scans `.css`, `.scss`, `.ts`, `.tsx`, `.js`, `.jsx` for design tokens, Tailwind config, CSS variables, and component patterns.
@@ -152,6 +175,7 @@ skillui --dir <path>          Scan a local project directory
 skillui --repo <url>          Clone and scan a git repository
 
 --mode ultra                  Enable cinematic extraction (requires Playwright)
+--interactive                 Prepare the page in a visible browser before extraction (requires --url; implies --mode ultra)
 --screens <n>                 Pages to crawl in ultra mode (default: 5, max: 20)
 --out <path>                  Output directory (default: ./)
 --name <string>               Override the project name
@@ -251,6 +275,7 @@ SkillUI uses pure static analysis. No AI, no API keys, no cloud - everything run
 
 - Node.js 18+
 - For `--mode ultra`: Playwright (`npm install playwright && npx playwright install chromium`)
+- For `--interactive`: the same Playwright setup, plus a display to show the browser window
 
 ---
 

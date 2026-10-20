@@ -13,7 +13,11 @@ export interface HttpExtractionResult {
   components: ComponentInfo[];
 }
 
-export async function extractHttpCSSTokens(url: string, maxPages = 3): Promise<HttpExtractionResult> {
+/**
+ * `renderedHtml` replaces the first fetch with the DOM of a page the user
+ * prepared in interactive mode. Linked stylesheets are still fetched over HTTP.
+ */
+export async function extractHttpCSSTokens(url: string, maxPages = 3, renderedHtml?: string): Promise<HttpExtractionResult> {
   const tokens: RawTokens = {
     colors: [],
     fonts: [],
@@ -53,7 +57,10 @@ export async function extractHttpCSSTokens(url: string, maxPages = 3): Promise<H
     visited.add(currentUrl);
 
     try {
-      const html = await fetchText(currentUrl);
+      // The first visit is the start URL (visited has one entry at this point)
+      const html = renderedHtml !== undefined && visited.size === 1
+        ? renderedHtml
+        : await fetchText(currentUrl);
       if (!html) continue;
       allHtml.push(html);
 

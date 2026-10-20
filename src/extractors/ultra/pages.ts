@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PageScreenshot, SectionScreenshot } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, openContext, restoreScroll } from '../../browser-target';
 
 /**
  * Ultra mode — Page & Section Screenshots
@@ -16,7 +17,8 @@ import { loadPlaywright } from '../../playwright-loader';
 export async function capturePageScreenshots(
   originUrl: string,
   skillDir: string,
-  maxPages: number
+  maxPages: number,
+  session?: InteractiveSession
 ): Promise<{ pages: PageScreenshot[]; sections: SectionScreenshot[] }> {
   const playwright = loadPlaywright();
   if (!playwright) return { pages: [], sections: [] };
@@ -29,17 +31,15 @@ export async function capturePageScreenshots(
   const pages: PageScreenshot[] = [];
   const sections: SectionScreenshot[] = [];
 
-  const browser = await playwright.chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  });
+  const { context, dispose } = await openContext(playwright, session);
+  let preparedTabUsed = false;
 
   try {
-    const origin = new URL(originUrl).origin;
+    // Interactive mode crawls from the page the user prepared, not from the original URL
+    const startUrl = session ? session.page.url() : originUrl;
+    const origin = new URL(startUrl).origin;
     const visited = new Set<string>();
-    const queue: string[] = [originUrl];
+    const queue: string[] = [startUrl];
 
     while (queue.length > 0 && visited.size < maxPages) {
       const url = queue.shift()!;
@@ -50,9 +50,18 @@ export async function capturePageScreenshots(
       const slug = urlToSlug(url, origin);
       const pageFile = path.join(pagesDir, `${slug}.png`);
 
+      // Interactive mode: the first visit is the prepared tab, left in its current state.
+      // Later visits open new pages in the same context, so cookies still carry over.
+      let page: any = null;
       try {
-        const page = await context.newPage();
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        if (session && !preparedTabUsed) {
+          preparedTabUsed = true;
+          page = session.page;
+          await restoreScroll(session);
+        } else {
+          page = await context.newPage();
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        }
         await page.waitForTimeout(3000);
 
         // Full-page screenshot
@@ -178,14 +187,19 @@ export async function capturePageScreenshots(
           }
         }
 
-        await page.close();
+        if (page !== session?.page) await page.close();
       } catch (err) {
         // Page failed — continue with next
-        try { await context.pages()[0]?.close(); } catch {}
+        if (session) {
+          // Never close the prepared tab; close only pages this loop opened
+          if (page && page !== session.page) await page.close().catch(() => {});
+        } else {
+          try { await context.pages()[0]?.close(); } catch {}
+        }
       }
     }
   } finally {
-    await browser.close().catch(() => {});
+    await dispose();
   }
 
   return { pages, sections };

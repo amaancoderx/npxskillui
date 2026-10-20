@@ -1,5 +1,6 @@
 import { DOMComponent } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, PageTarget, openPage } from '../../browser-target';
 
 /**
  * Ultra mode — DOM Component Detector
@@ -11,21 +12,14 @@ import { loadPlaywright } from '../../playwright-loader';
  *
  * Requires Playwright (optional peer dependency).
  */
-export async function detectDOMComponents(url: string): Promise<DOMComponent[]> {
+export async function detectDOMComponents(url: string, session?: InteractiveSession): Promise<DOMComponent[]> {
   const playwright = loadPlaywright();
   if (!playwright) return [];
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  let target: PageTarget | undefined;
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
-
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
+    target = await openPage(playwright, url, { session, settleMs: 3000 });
+    const { page } = target;
 
     const components: DOMComponent[] = await page.evaluate(() => {
       // ── Fingerprint an element by its structure ───────────────────────
@@ -139,12 +133,10 @@ export async function detectDOMComponents(url: string): Promise<DOMComponent[]> 
       return results.sort((a, b) => b.instances - a.instances);
     });
 
-    await page.close();
-    await browser.close();
-
     return components;
   } catch {
-    await browser.close().catch(() => {});
     return [];
+  } finally {
+    await target?.dispose();
   }
 }

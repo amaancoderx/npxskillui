@@ -13,11 +13,13 @@ import { generateComponentsMd } from '../writers/components-md';
 import { generateAnimationsMd } from '../writers/animations-md';
 import { writeTokensJson } from '../writers/tokens-json';
 import { loadPlaywright } from '../playwright-loader';
+import { InteractiveSession } from '../browser-target';
 
 /**
  * Ultra mode orchestrator.
  *
- * Runs AFTER the normal url mode pipeline. Adds:
+ * Runs AFTER the normal url mode pipeline. With an interactive session, every
+ * extractor works on the page the user prepared instead of loading the URL again. Adds:
  * - screens/pages/      — full-page screenshots per crawled page
  * - screens/sections/   — clipped section screenshots per page
  * - screens/states/     — hover/focus state screenshots per interactive element
@@ -36,7 +38,8 @@ export async function runUltraMode(
   url: string,
   profile: DesignProfile,
   skillDir: string,
-  opts: UltraOptions
+  opts: UltraOptions,
+  session?: InteractiveSession
 ): Promise<UltraResult> {
   // Ensure all output directories exist
   fs.mkdirSync(path.join(skillDir, 'screens', 'pages'), { recursive: true });
@@ -58,19 +61,19 @@ export async function runUltraMode(
   }
 
   // ── Step 1: Animation extraction (scroll journey + keyframes + libraries) ──
-  const animations = await captureAnimations(url, skillDir);
+  const animations = await captureAnimations(url, skillDir, session);
 
   // ── Step 2: Multi-page screenshots + section clips ─────────────────────
-  const { pages, sections } = await capturePageScreenshots(url, skillDir, opts.screens);
+  const { pages, sections } = await capturePageScreenshots(url, skillDir, opts.screens, session);
 
   // ── Step 3: Micro-interactions ────────────────────────────────────────
-  const interactions = await captureInteractions(url, skillDir);
+  const interactions = await captureInteractions(url, skillDir, session);
 
   // ── Step 4: Layout extraction ──────────────────────────────────────────
-  const layouts = await extractLayouts(url);
+  const layouts = await extractLayouts(url, session);
 
   // ── Step 5: DOM component detection ───────────────────────────────────
-  const domComponents = await detectDOMComponents(url);
+  const domComponents = await detectDOMComponents(url, session);
 
   // ── Step 6: Write all reference files ─────────────────────────────────
 

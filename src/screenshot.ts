@@ -59,3 +59,24 @@ export async function captureScreenshot(
     return null;
   }
 }
+
+/**
+ * Screenshot of the page the user prepared in interactive mode. Captures the
+ * viewport as it is now, so overlays already dismissed stay dismissed.
+ *
+ * Saves to skillDir/screenshots/homepage.png. Returns the local relative path,
+ * or null if capture fails.
+ */
+export async function captureSessionScreenshot(
+  page: any,
+  skillDir: string
+): Promise<string | null> {
+  try {
+    const screenshotsDir = path.join(skillDir, 'screenshots');
+    fs.mkdirSync(screenshotsDir, { recursive: true });
+    await page.screenshot({ path: path.join(screenshotsDir, 'homepage.png') });
+    return 'screenshots/homepage.png';
+  } catch {
+    return null;
+  }
+}

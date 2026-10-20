@@ -1,11 +1,14 @@
 import { RawTokens } from '../../types';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, openContext } from '../../browser-target';
 
 /**
  * URL mode: Extract computed styles from live DOM using Playwright.
  * Playwright is an optional peer dependency.
+ *
+ * With an interactive session, only the prepared tab is sampled, in its current state.
  */
-export async function extractComputedTokens(url: string, maxPages = 5): Promise<RawTokens> {
+export async function extractComputedTokens(url: string, maxPages = 5, session?: InteractiveSession): Promise<RawTokens> {
   const tokens: RawTokens = {
     colors: [],
     fonts: [],
@@ -32,24 +35,28 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
     return tokens;
   }
 
-  const browser = await playwright.chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  });
+  const { context, dispose } = await openContext(playwright, session);
 
   try {
+    const pageLimit = session ? 1 : maxPages;
+    let preparedTabUsed = false;
     const visited = new Set<string>();
-    const toVisit = [url];
+    const toVisit = [session ? session.page.url() : url];
 
-    while (toVisit.length > 0 && visited.size < maxPages) {
+    while (toVisit.length > 0 && visited.size < pageLimit) {
       const currentUrl = toVisit.shift()!;
       if (visited.has(currentUrl)) continue;
       visited.add(currentUrl);
 
+      let page: any;
       try {
-        const page = await context.newPage();
-        await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        if (session && !preparedTabUsed) {
+          preparedTabUsed = true;
+          page = session.page;
+        } else {
+          page = await context.newPage();
+          await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        }
 
         // Wait a moment for any JS-rendered content
         await page.waitForTimeout(1500);
@@ -246,13 +253,13 @@ export async function extractComputedTokens(url: string, maxPages = 5): Promise<
           if (!visited.has(link)) toVisit.push(link);
         }
 
-        await page.close();
+        if (page !== session?.page) await page.close();
       } catch {
         // Skip pages that fail to load
       }
     }
   } finally {
-    await browser.close();
+    await dispose();
   }
 
   return tokens;

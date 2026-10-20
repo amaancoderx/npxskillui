@@ -1,5 +1,6 @@
 import { LayoutRecord } from '../../types-ultra';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, PageTarget, openPage } from '../../browser-target';
 
 /**
  * Ultra mode — DOM Layout Extractor
@@ -12,21 +13,14 @@ import { loadPlaywright } from '../../playwright-loader';
  * Returns LayoutRecord[] for LAYOUT.md generation.
  * Requires Playwright (optional peer dependency).
  */
-export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
+export async function extractLayouts(url: string, session?: InteractiveSession): Promise<LayoutRecord[]> {
   const playwright = loadPlaywright();
   if (!playwright) return [];
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  let target: PageTarget | undefined;
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
-
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
+    target = await openPage(playwright, url, { session, settleMs: 3000 });
+    const { page } = target;
 
     const records: LayoutRecord[] = await page.evaluate(() => {
       const LAYOUT_SELECTORS = [
@@ -117,11 +111,10 @@ export async function extractLayouts(url: string): Promise<LayoutRecord[]> {
       return results.sort((a, b) => a.depth - b.depth).slice(0, 40);
     });
 
-    await page.close();
-    await browser.close();
     return records;
   } catch {
-    await browser.close().catch(() => {});
     return [];
+  } finally {
+    await target?.dispose();
   }
 }

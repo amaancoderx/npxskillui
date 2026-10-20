@@ -1,9 +1,10 @@
 import { extractComputedTokens } from '../extractors/tokens/computed';
 import { extractHttpCSSTokens } from '../extractors/tokens/http-css';
 import { normalize } from '../normalizer';
-import { captureScreenshot } from '../screenshot';
+import { captureScreenshot, captureSessionScreenshot } from '../screenshot';
 import { DesignProfile, RawTokens, ComponentInfo } from '../types';
 import { loadPlaywright } from '../playwright-loader';
+import { InteractiveSession } from '../browser-target';
 
 /**
  * URL mode: crawl a live website and extract design tokens.
@@ -12,12 +13,17 @@ import { loadPlaywright } from '../playwright-loader';
  * 1. ALWAYS fetch HTML + linked CSS via HTTP (no Playwright needed)
  * 2. If Playwright is available, ALSO extract computed styles from live DOM
  * 3. Merge both token sets for maximum coverage
+ *
+ * With an interactive session, steps 1-2 and the screenshot use the page the
+ * user prepared: its rendered HTML, its computed styles, and its viewport.
  */
-export async function runUrlMode(url: string, nameOverride?: string, skillDir?: string): Promise<{ profile: DesignProfile; screenshotPath: string | null; cssColorCount: number; cssFontCount: number; computedColorCount: number; hadPlaywright: boolean }> {
+export async function runUrlMode(url: string, nameOverride?: string, skillDir?: string, session?: InteractiveSession): Promise<{ profile: DesignProfile; screenshotPath: string | null; cssColorCount: number; cssFontCount: number; computedColorCount: number; hadPlaywright: boolean }> {
   const projectName = nameOverride || deriveUrlName(url);
+  const pageUrl = session ? session.page.url() : url;
 
   // Step 1: HTTP-based extraction (always works, no Playwright)
-  const httpResult = await extractHttpCSSTokens(url, 5);
+  const renderedHtml = session ? await session.page.content() : undefined;
+  const httpResult = await extractHttpCSSTokens(pageUrl, session ? 1 : 5, renderedHtml);
   const httpTokens = httpResult.tokens;
   const httpComponents = httpResult.components;
   const cssColorCount = httpTokens.colors.length;
@@ -31,7 +37,7 @@ export async function runUrlMode(url: string, nameOverride?: string, skillDir?: 
 
   if (hadPlaywright) {
     try {
-      computedTokens = await extractComputedTokens(url, 3);
+      computedTokens = await extractComputedTokens(url, 3, session);
       computedColorCount = computedTokens.colors.length;
     } catch { /* Playwright extraction failed, use CSS-only */ }
   }
@@ -47,13 +53,15 @@ export async function runUrlMode(url: string, nameOverride?: string, skillDir?: 
   });
 
   // Attach URL metadata to profile
-  profile.siteUrl = url;
+  profile.siteUrl = pageUrl;
   profile.favicon = merged.favicon || null;
 
   // Step 5: Capture screenshot (best-effort, non-blocking)
   let screenshotPath: string | null = null;
   if (skillDir) {
-    screenshotPath = await captureScreenshot(url, skillDir);
+    screenshotPath = session
+      ? await captureSessionScreenshot(session.page, skillDir)
+      : await captureScreenshot(url, skillDir);
   }
 
   return { profile, screenshotPath, cssColorCount, cssFontCount, computedColorCount, hadPlaywright };

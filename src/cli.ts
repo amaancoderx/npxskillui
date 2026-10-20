@@ -8,6 +8,9 @@ import { runUltraMode } from './modes/ultra.js';
 import { generateDesignMd } from './writers/design-md.js';
 import { generateSkill } from './writers/skill.js';
 import { CLIOptions, DesignProfile } from './types.js';
+import { InteractiveSession } from './browser-target.js';
+import { prepareInteractiveSession } from './interactive-session.js';
+import { loadPlaywright } from './playwright-loader.js';
 import {
   VERSION,
   showLogo,
@@ -36,6 +39,16 @@ program
   .option('--format <format>', 'Output format: design-md | skill | both', 'both')
   .option('--mode <mode>', 'Extraction mode: default | ultra', 'default')
   .option('--screens <number>', 'Ultra mode: max pages to crawl (default: 5)', '5')
+  .option('--interactive', 'Prepare the page in a visible browser before extraction (requires --url; implies --mode ultra)')
+  .addHelpText('after', `
+Interactive mode (--interactive):
+  Opens the site in a visible Chromium window and waits. Prepare the page there:
+  dismiss cookie banners, close overlays, accept consent you agree to, click
+  continue buttons, and open the content you want analyzed. Nothing is clicked
+  for you. Press Enter in this terminal when the page is ready. Extraction then
+  runs on that same browser tab, keeping its cookies and page state. If the site
+  opens a new tab, you choose which tab to extract. Press Ctrl+C to cancel.
+`)
   .action(async (opts: CLIOptions) => {
     // Always show the logo on every command
     await showLogo();
@@ -56,9 +69,23 @@ program
       process.exit(1);
     }
 
+    if (opts.interactive) {
+      if (!opts.url) {
+        console.error('  Error: --interactive needs --url\n');
+        process.exit(1);
+      }
+      if (!loadPlaywright()) {
+        showUltraPlaywrightError();
+        process.exit(1);
+      }
+    }
+
     // ── Determine target label for brief ──────────────────────────────
     const target = opts.url || opts.dir || opts.repo || '';
     showMissionBrief(opts.mode || 'default', target, path.resolve(opts.out));
+
+    // Browser the user prepares in interactive mode. Closed once extraction finishes.
+    let interactiveSession: InteractiveSession | undefined;
 
     try {
       let profile: DesignProfile;
@@ -101,10 +128,15 @@ program
         const skillDir = path.join(outputDir, `${safeName}-design`);
         fs.mkdirSync(path.join(skillDir, 'screenshots'), { recursive: true });
 
+        // Interactive mode pauses here until the user has prepared the page
+        if (opts.interactive) {
+          interactiveSession = await prepareInteractiveSession(loadPlaywright(), opts.url!);
+        }
+
         const sp1 = startSpinner('Fetching HTML + CSS...');
         let urlResult: Awaited<ReturnType<typeof runUrlMode>>;
         try {
-          urlResult = await runUrlMode(opts.url!, opts.name, skillDir);
+          urlResult = await runUrlMode(opts.url!, opts.name, skillDir, interactiveSession);
           const { cssColorCount, cssFontCount, computedColorCount, hadPlaywright } = urlResult;
           const detail = hadPlaywright
             ? `${cssColorCount} CSS colors · ${computedColorCount} computed · ${cssFontCount} fonts`
@@ -122,8 +154,8 @@ program
         screenshotPath = urlResult.screenshotPath;
       }
 
-      // ── Ultra mode (URL only) ──────────────────────────────────────
-      const isUltra = opts.mode === 'ultra' && !!opts.url;
+      // ── Ultra mode (URL only; interactive mode always runs it) ─────
+      const isUltra = (opts.mode === 'ultra' || !!opts.interactive) && !!opts.url;
       let ultraAnimations: import('./types-ultra.js').FullAnimationResult | null = null;
 
       if (isUltra) {
@@ -133,14 +165,13 @@ program
         const skillDir = path.join(path.resolve(opts.out), `${safeName}-design`);
 
         // Check playwright before spinning up ultra
-        const { loadPlaywright } = await import('./playwright-loader.js');
         if (!loadPlaywright()) {
           showUltraPlaywrightError();
           warnLine('Continuing without ultra features...');
         } else {
           const spAnim = startSpinner('Capturing scroll journey + animations...');
           try {
-            const ultraResult = await runUltraMode(opts.url!, profile, skillDir, { screens: ultraScreens });
+            const ultraResult = await runUltraMode(opts.url!, profile, skillDir, { screens: ultraScreens }, interactiveSession);
             ultraAnimations = ultraResult.animations;
             const kf = ultraAnimations.keyframes.length;
             const sf = ultraAnimations.scrollFrames.length;
@@ -152,6 +183,10 @@ program
           }
         }
       }
+
+      // Extraction is finished, so the prepared browser can close
+      await interactiveSession?.close();
+      interactiveSession = undefined;
 
       // ── Generate + write outputs ───────────────────────────────────
       const shouldWriteDesignMd = opts.format === 'design-md' || opts.format === 'both';
@@ -201,7 +236,10 @@ program
       });
 
     } catch (err: any) {
-      console.error(`\n  Error: ${err.message || err}\n`);
+      const windowClosed = interactiveSession?.wasClosed() ?? false;
+      await interactiveSession?.close();
+      const message = windowClosed ? 'The browser window was closed before extraction finished.' : err.message || err;
+      console.error(`\n  Error: ${message}\n`);
       process.exit(1);
     }
   });

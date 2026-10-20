@@ -258,4 +258,5 @@ export interface CLIOptions {
   format: 'design-md' | 'skill' | 'both';
   mode: 'default' | 'ultra';
   screens: string;
+  interactive?: boolean;
 }

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadPlaywright } from '../../playwright-loader';
+import { InteractiveSession, openPage } from '../../browser-target';
 import {
   FullAnimationResult,
   ExtractedKeyframe,
@@ -31,7 +32,8 @@ import {
  */
 export async function captureAnimations(
   url: string,
-  skillDir: string
+  skillDir: string,
+  session?: InteractiveSession
 ): Promise<FullAnimationResult> {
   const empty: FullAnimationResult = {
     keyframes: [],
@@ -52,26 +54,20 @@ export async function captureAnimations(
   const scrollDir = path.join(skillDir, 'screens', 'scroll');
   fs.mkdirSync(scrollDir, { recursive: true });
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  const target = await openPage(playwright, url, {
+    session,
+    settleMs: 3000,
+    beforeNavigate: async (page) => {
+      // Disable CSS animations for initial load (avoids capturing mid-animation state)
+      // We'll re-enable them before scroll capture
+      await page.addInitScript(() => {
+        // Store original to restore later
+        (window as any).__claudeui_originalRAF = window.requestAnimationFrame;
+      });
+    },
+  });
+  const { page } = target;
   try {
-    const context = await browser.newContext({
-      viewport: { width: 1440, height: 900 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
-
-    const page = await context.newPage();
-
-    // Disable CSS animations for initial load (avoids capturing mid-animation state)
-    // We'll re-enable them before scroll capture
-    await page.addInitScript(() => {
-      // Store original to restore later
-      (window as any).__claudeui_originalRAF = window.requestAnimationFrame;
-    });
-
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
-
     // ── Phase 1: Extract CSS keyframes from document.styleSheets ──────────
     const keyframesRaw = await page.evaluate(() => {
       const result: Array<{
@@ -507,8 +503,6 @@ export async function captureAnimations(
       } catch { /* frame failed */ }
     }
 
-    await page.close();
-
     return {
       keyframes,
       scrollFrames,
@@ -522,7 +516,7 @@ export async function captureAnimations(
       lottieCount: mediaInfo.lottieCount,
     };
   } finally {
-    await browser.close().catch(() => {});
+    await target.dispose();
   }
 }
 
